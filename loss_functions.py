@@ -164,7 +164,7 @@ def initialize_hji_drone2D(dataset, minWith):
 
             a=torch.atan2(dudx[..., 1], dudx[..., 0])
             # Compute the hamiltonian for the Drone2D
-            ham = velocity*torch.norm(dudx,dim=2)*((torch.abs(a)<=theta_range).type(torch.uint8)*1. + (torch.abs(a)>theta_range).type(torch.uint8)*torch.max(torch.cos(a-theta_range),torch.cos(a+theta_range)))
+            ham = velocity*torch.norm(dudx, dim=2)*torch.where((torch.abs(a)<=theta_range), torch.tensor([1.0]), torch.max(torch.cos(a-theta_range),torch.cos(a+theta_range)))
             ham = ham - disturbance_mag*torch.norm(dudx,dim=2)
 
             # If we are computing BRT then take min with zero
