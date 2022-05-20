@@ -35,8 +35,8 @@ checkpoints_toload = [119000]
 query_times = [1.0]
 
 # Initial state
-xinit = np.array([0.5, -0.25, 0.5*math.pi, 5.0])#[x_r,y_r,theta_r,w_a]
-xinit_a = np.array([0, 0, 0])#x_a,y_a,theta_a
+xinit = np.array([0.5, 0, 0.25*math.pi, 5.0])#[x_r,y_r,theta_r,w_a]
+xinit_a = np.array([-0.25, -0.75, 0.5*math.pi])#x_a,y_a,theta_a
 xinit_b = xinit_a + xinit[0:3] #x_b,y_b,theta_b
 
 # Simulation time
@@ -51,7 +51,7 @@ var = 0.5
 # Time vector
 num_timesteps = int(tMax/dt)+1
 t_omega_change=np.array([0, 0.1, 0.25])#times when omega_a changes
-omega_t=np.array([xinit[3], 2.5, xinit[3]])#omega_a values
+omega_t=np.array([xinit[3], xinit[3], xinit[3]])#omega_a values
 k_t=np.zeros(len(omega_t)) #used to store the iteration of the change
 
 # Number of cases to simulate
@@ -81,7 +81,7 @@ def propagate_state_a(state, control):
   return state_next
 
 def propagate_state_b(state, disturbance):
-  state_next = state + dt*np.array( [speed*np.cos(state[2]), speed*np.sin(state[2]), disturbance[0]])
+  state_next = state + dt*np.array( [speed*np.cos(state[2]), speed*np.sin(state[2]), -disturbance[0]])
   state_next[2] = angle_normalize(state_next[2])
   return state_next
 
@@ -211,6 +211,7 @@ ax.set_ylim(-1., 1.)
 ax1 = fig.add_subplot(gs[3:6,0:3])
 s1 = ax1.plot(state_traj_a[:, 0], state_traj_a[:, 1], 'b', zorder=1)
 s1 = ax1.plot(state_traj_b[:, 0], state_traj_b[:, 1], 'r', zorder=1)
+plt.axvline(x=0,linestyle='--')
 ax1.set_xlim(-1., 1.)
 ax1.set_ylim(-1., 1.)
 
@@ -270,7 +271,7 @@ for i in range(len(k_t)):
   fig.colorbar(s) 
 
 # Run the program
-fig.savefig(os.path.join('./deepreach_uncertain_parameter/', 'Traj_plots', 'Traj_comp.png'))
+fig.savefig(os.path.join('./deepreach_uncertain_parameter/', 'Traj_plots', 'Traj_comp_centerline.png'))
 # Save the trajectory data
 data_dict ={}
 data_dict['state_traj'] = state_traj

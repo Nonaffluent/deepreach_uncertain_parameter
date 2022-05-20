@@ -313,6 +313,107 @@ class ReachabilityAir3Dp1DSource(Dataset):
         return {'coords': coords}, {'source_boundary_values': boundary_values, 'dirichlet_mask': dirichlet_mask}
 
 
+class ReachabilityDrone3Dp1DSource(Dataset):
+    def __init__(self, numpoints, velocity=2.0,
+        omega_max=1.0, pretrain=False, tMin=0.0,
+        tMax=4.0, counter_start=0, counter_end=100e3, 
+        pretrain_iters=2000, angle_alpha=1.0, num_src_samples=1000, seed=0):
+        super().__init__()
+        torch.manual_seed(0)
+
+        self.pretrain = pretrain
+        self.numpoints = numpoints
+        
+        self.velocity = velocity
+        self.omega_max = omega_max       
+
+        self.alpha_angle = angle_alpha * math.pi
+
+        self.num_states = 4
+
+        self.tMax = tMax
+        self.tMin = tMin
+
+        self.N_src_samples = num_src_samples
+
+        self.pretrain_counter = 0
+        self.counter = counter_start
+        self.pretrain_iters = pretrain_iters
+        self.full_count = counter_end 
+
+        # Set the seed
+        torch.manual_seed(seed)
+
+    def __len__(self):
+        return 1
+
+    def compute_lx(self, state_coords): #target set hardcoded to circle centered in (15,25) with r=4
+        # Compute the target boundary condition given the normalized state coordinates.
+        goal_tensor = torch.tensor([-.25, .25]).type(torch.FloatTensor)[None]
+        dist = torch.norm(state_coords[:, 0:2] - goal_tensor, dim=1, keepdim=True) - 0.2
+        return dist
+
+    def compute_gx(self, state_coords):
+        # Compute the obstacle boundary condition given the state coordinates. Negative inside the obstacle positive outside.
+        dist_obs1 = torch.max(torch.abs(state_coords[:, 0] - (-.75)) - .25, torch.abs(state_coords[:, 1] - (-.25)) - .25)
+        dist_obs2 = torch.max(torch.abs(state_coords[:, 0] - (-.15)) - .15, torch.abs(state_coords[:, 1] - (-.25)) - .25)
+        dist = torch.min(dist_obs1,dist_obs2)
+        dist = torch.unsqueeze(dist, 1)
+        return dist
+
+    def compute_IC(self, state_coords):
+        lx = self.compute_lx(state_coords)
+        gx = self.compute_gx(state_coords)
+        hx = -gx       
+        vx = torch.max(lx, hx)
+        return lx, hx, vx    
+
+
+    def __getitem__(self, idx):
+        start_time = 0.  # time to apply  initial conditions
+
+        # uniformly sample domain and include coordinates where source is non-zero 
+        coords = torch.zeros(self.numpoints, self.num_states).uniform_(-1, 1)
+
+        if self.pretrain:
+            # only sample in time around the initial condition
+            time = torch.ones(self.numpoints, 1) * start_time
+            coords = torch.cat((time, coords), dim=1)
+        else:
+            # slowly grow time values from start time
+            # this currently assumes start_time = 0 and max time value is tMax
+            time = self.tMin + torch.zeros(self.numpoints, 1).uniform_(0, (self.tMax-self.tMin) * (self.counter / self.full_count))
+            coords = torch.cat((time, coords), dim=1)
+
+            # make sure we always have training samples at the initial time
+            coords[-self.N_src_samples:, 0] = start_time
+          
+        # set up the initial value function
+        lx, hx, boundary_values = self.compute_IC(coords[:, 1:])
+        # normalize the value function
+        norm_to = 0.02
+        mean = 0.25
+        var = 0.5
+        
+        boundary_values = (boundary_values - mean)*norm_to/var
+        lx = (lx - mean)*norm_to/var
+        hx = (hx - mean)*norm_to/var
+                
+        if self.pretrain:
+            dirichlet_mask = torch.ones(coords.shape[0], 1) > 0
+        else:
+            # only enforce initial conditions around start_time
+            dirichlet_mask = (coords[:, 0, None] == start_time)
+
+        if self.pretrain:
+            self.pretrain_counter += 1
+        elif self.counter < self.full_count:
+            self.counter += 1
+
+        if self.pretrain and self.pretrain_counter == self.pretrain_iters:
+            self.pretrain = False
+
+        return {'coords': coords}, {'source_boundary_values': boundary_values, 'dirichlet_mask': dirichlet_mask,'lx': lx, 'hx': hx}
 
 
 class ReachabilityDrone2DSource(Dataset):
