@@ -35,9 +35,19 @@ checkpoints_toload = [119000]
 query_times = [1.0]
 
 # Initial state
-xinit = np.array([0.5, 0, 0.25*math.pi, 5.0])#[x_r,y_r,theta_r,w_a]
-xinit_a = np.array([-0.25, -0.75, 0.5*math.pi])#x_a,y_a,theta_a
-xinit_b = xinit_a + xinit[0:3] #x_b,y_b,theta_b
+wa_init=np.array([5.0]) #wa init state
+xinit = np.array([0.6, -0.3, 0.5*math.pi]) #x_r,y_r,theta_r
+xinit_a = np.array([0.25, -0.25, 0.5*math.pi])#x_a,y_a,theta_a
+#xinit_a = np.array([0.25, 0, math.pi])#x_a,y_a,theta_a
+#xinit_b = np.array([0.25, -0.75, 0.5*math.pi]) #x_b,y_b,theta_b
+
+#T = np.array([np.cos(xinit_a[2]), np.sin(xinit_a[2]),0, -np.sin(xinit_a[2]), np.cos(xinit_a[2]), 0, 0, 0, 1]).reshape(3, 3)
+#xinit=T.dot(xinit_b-xinit_a) #absolute to relative coord transformation
+
+TT = np.array([np.cos(xinit_a[2]), -np.sin(xinit_a[2]),0, np.sin(xinit_a[2]), np.cos(xinit_a[2]), 0, 0, 0, 1]).reshape(3, 3)
+xinit_b=TT.dot(xinit)+xinit_a
+
+xinit=np.concatenate([xinit,wa_init])#[x_r,y_r,theta_r,w_a]
 
 # Simulation time
 tMax = 1.0
@@ -50,9 +60,9 @@ var = 0.5
 
 # Time vector
 num_timesteps = int(tMax/dt)+1
-t_omega_change=np.array([0, 0.1, 0.25])#times when omega_a changes
-omega_t=np.array([xinit[3], xinit[3], xinit[3]])#omega_a values
-k_t=np.zeros(len(omega_t)) #used to store the iteration of the change
+t_omega_change=np.array([0, 0.0025, 0.25])#times when omega_a changes
+omega_t=np.array([xinit[3], 2.5, xinit[3]])#omega_a values
+k_t=(t_omega_change/dt).astype(int) #iteration of the change
 
 # Number of cases to simulate
 num_ckpts = len(checkpoints_toload)
@@ -81,7 +91,7 @@ def propagate_state_a(state, control):
   return state_next
 
 def propagate_state_b(state, disturbance):
-  state_next = state + dt*np.array( [speed*np.cos(state[2]), speed*np.sin(state[2]), -disturbance[0]])
+  state_next = state + dt*np.array( [speed*np.cos(state[2]), speed*np.sin(state[2]), disturbance[0]])
   state_next[2] = angle_normalize(state_next[2])
   return state_next
 
@@ -152,7 +162,8 @@ for k in range(num_timesteps-1):
   coords[0, 1] = coords[0, 1] * state_traj[k, 0]
   coords[0, 2] = coords[0, 2] * state_traj[k, 1]
   coords[0, 3] = coords[0, 3] * state_traj[k, 2]/(math.pi * angle_alpha)
-  coords[0, 4] = coords[0, 4] * omega_normalize(state_traj[k, 3]) 
+  #coords[0, 4] = coords[0, 4] * omega_normalize(state_traj[k, 3])
+  coords[0, 4] = coords[0, 4] * omega_normalize(xinit[3])  
 
   tEarliest = compute_tEarliest(coords,query_times[0])
   coords[0, 0] = coords[0, 0] * tEarliest   
@@ -171,7 +182,18 @@ for k in range(num_timesteps-1):
 
   # Compute the optimal control
   det = dudx[..., 0] * state_traj[k, 1] - dudx[..., 1] * state_traj[k, 0] - dudx[..., 2]#p1*y-p2*x-p3
-  ctrls[k, 0] = state_traj[k, 3] * np.sign(det)
+  
+
+  norm_to = 0.02
+  mean = 0.25
+  var = 0.5
+  model_out=model_out['model_out']
+  model_out = (model_out*var/norm_to) + mean
+  if (model_out<= 0.001): #if inside the BRT
+    ctrls[k, 0] = state_traj[k, 3] * np.sign(det) #optimal ctrl
+  else: #otherwise line folllowing ctrl
+    ctrls[k, 0] = np.clip( -4.0 * angle_normalize(state_traj_a[k, 2]-0.5*math.pi),-state_traj[k, 3], state_traj[k, 3])
+
   ctrl_dets[k, 0] = det
 
   # Compute the optimal disturbance
@@ -183,52 +205,56 @@ for k in range(num_timesteps-1):
   state_traj_a[k+1] = propagate_state_a(state_traj_a[k], ctrls[k])
   state_traj_b[k+1] = propagate_state_b(state_traj_b[k], dstbs[k])
 
-  n = np.argwhere(t_omega_change==k*dt)#if this k corresponds to an omega change instant 
+  n = np.argwhere(k_t==k)#if this k corresponds to an omega change instant 
   if n.size: #n is non empty
     state_traj[k+1,3]=omega_t[n[0]]#change the omega_a in the state vector
-    k_t[n[0]]= k #save the iteration that corresponds to this time
+
 
 # Setting up the plot surface
 fig = plt.figure(figsize=(10, 12))
 gs = GridSpec(nrows=6, ncols=5)
 
 #Plot relative position state
-ax = fig.add_subplot(gs[0:3,0:3])
-s = ax.plot(state_traj[:, 0], state_traj[:, 1], 'r')
+ax = fig.add_subplot(gs[0:3,0:3]) 
+xr=state_traj[:, 0]*1
+yr=state_traj[:, 1]*1
+col = np.where(xr*xr+yr*yr<collisionR*collisionR*0.95,'r','b')
+s = ax.scatter(state_traj[:, 0], state_traj[:, 1],s=4,linewidth=0,c=col,zorder=1)
+
 #Plot start and omega change points
 for m in range(len(k_t)):
-  ax.plot(state_traj[k_t[m].astype(int), 0], state_traj[k_t[m].astype(int), 1], marker="o", markersize=5, markeredgecolor="k", markerfacecolor="r")
+  ax.plot(state_traj[k_t[m].astype(int), 0], state_traj[k_t[m].astype(int), 1], marker="o", markersize=5, markeredgecolor="k", markerfacecolor="k",zorder=2)
 # Plot the target set
 circle = plt.Circle(np.array([0, 0]), collisionR, color='k', fill=False, linestyle='--')
 ax.add_artist(circle)
 # Set the axes limits and title
+#kk=150 #test point
+#ax.plot(state_traj[kk, 0], state_traj[kk, 1], marker="o", markersize=5, markeredgecolor="k", markerfacecolor="c",zorder=2)
 ax.set_title('ckpt = %iK, t = %0.2f' % (checkpoints_toload[0]/1000 - 10, query_times[0]))
-ax.set_xlim(-1., 1.)
-ax.set_ylim(-1., 1.)
+ax.set_xlim(-.75, .75)
+ax.set_ylim(-.75, .75)
 
 
 #Plot absolute position states
 ax1 = fig.add_subplot(gs[3:6,0:3])
 s1 = ax1.plot(state_traj_a[:, 0], state_traj_a[:, 1], 'b', zorder=1)
 s1 = ax1.plot(state_traj_b[:, 0], state_traj_b[:, 1], 'r', zorder=1)
-plt.axvline(x=0,linestyle='--')
-ax1.set_xlim(-1., 1.)
-ax1.set_ylim(-1., 1.)
+plt.axhspan(.75, .6, color='green', alpha=0.2)
+#plt.axhline(y=.74,linestyle='--',c='g')
+ax1.set_xlim(-.75, .75)
+ax1.set_ylim(-.75, .75)
 
-n_data_points=len(state_traj[:, 0])
-arrow_steps=5
-step_size=round(n_data_points/arrow_steps)
-for l in range(arrow_steps):
-  c1=step_size*l
-  c2=step_size*l + 20
-  ac=(0.1+0.05*l, 0.6-0.10*l, 0.1+0.05*l)#arrowcolor
-  plt.arrow(state_traj_a[c1, 0], state_traj_a[c1, 1], state_traj_a[c2, 0]-state_traj_a[c1, 0], state_traj_a[c2, 1]-state_traj_a[c1, 1],
-  ec=ac, fc=ac, alpha=1.0, width=.02,head_width=.04, head_length=.05,length_includes_head=True,zorder=2)
-  plt.arrow(state_traj_b[c1, 0], state_traj_b[c1, 1], state_traj_b[c2, 0]-state_traj_b[c1, 0], state_traj_b[c2, 1]-state_traj_b[c1, 1],
-  ec=ac, fc=ac, alpha=1.0, width=.02,head_width=.04, head_length=.05,length_includes_head=True,zorder=2)
-  # Plot the target set
-  circle = plt.Circle(np.array([state_traj_a[c1, 0], state_traj_a[c1, 1]]), collisionR, color=ac, fill=False, linestyle='--', alpha=.7)
-  ax1.add_artist(circle)
+
+
+k_crash=150 #from test point in relative coord
+ac=(0.5, 0.6, 0.1)#arrowcolor
+plt.arrow(state_traj_a[k_crash, 0], state_traj_a[k_crash, 1], state_traj_a[k_crash+10, 0]-state_traj_a[k_crash, 0], state_traj_a[k_crash+10, 1]-state_traj_a[k_crash, 1],
+ec=ac, fc=ac, alpha=1.0, width=.02,head_width=.04, head_length=.05,length_includes_head=True,zorder=2)
+plt.arrow(state_traj_b[k_crash, 0], state_traj_b[k_crash, 1], state_traj_b[k_crash+10, 0]-state_traj_b[k_crash, 0], state_traj_b[k_crash+10, 1]-state_traj_b[k_crash, 1],
+ec=ac, fc=ac, alpha=1.0, width=.02,head_width=.04, head_length=.05,length_includes_head=True,zorder=2)
+# Plot the target set
+circle = plt.Circle(np.array([state_traj_a[k_crash, 0], state_traj_a[k_crash, 1]]), collisionR, color=ac, fill=False, linestyle='--', alpha=.7)
+ax1.add_artist(circle)
 
 
 

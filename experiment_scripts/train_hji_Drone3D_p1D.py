@@ -37,7 +37,7 @@ p.add_argument('--model', type=str, default='sine', required=False, choices=['si
 p.add_argument('--mode', type=str, default='mlp', required=False, choices=['mlp', 'rbf', 'pinn'],
                help='Whether to use uniform velocity parameter')
 p.add_argument('--tMin', type=float, default=0.0, required=False, help='Start time of the simulation')
-p.add_argument('--tMax', type=float, default=4.0, required=False, help='End time of the simulation')##
+p.add_argument('--tMax', type=float, default=1.0, required=False, help='End time of the simulation')##
 p.add_argument('--num_hl', type=int, default=3, required=False, help='The number of hidden layers')
 p.add_argument('--num_nl', type=int, default=512, required=False, help='Number of neurons per hidden layer.')
 p.add_argument('--pretrain_iters', type=int, default=10000, required=False, help='Number of pretrain iterations')#
@@ -45,8 +45,8 @@ p.add_argument('--counter_start', type=int, default=-1, required=False, help='De
 p.add_argument('--counter_end', type=int, default=110000, required=False, help='Defines the linear step for curriculum training starting from the initial time')#
 p.add_argument('--num_src_samples', type=int, default=10000, required=False, help='Number of source samples at each time step')#
 
-p.add_argument('--velocity', type=float, default=2.0, required=False, help='Speed of the Drone')#
-p.add_argument('--omega_max', type=float, default=1.0, required=False, help='Turn rate of the car')#
+p.add_argument('--velocity', type=float, default=8.0, required=False, help='Speed of the Drone')#
+p.add_argument('--omega_max', type=float, default=80.0, required=False, help='Turn rate of the car')#
 p.add_argument('--angle_alpha', type=float, default=1.2, required=False, help='Angle alpha coefficient.')#
 #p.add_argument('--collisionR', type=float, default=0.25, required=False, help='Collision radisu between vehicles')
 p.add_argument('--minWith', type=str, default='target', required=False, choices=['none', 'zero', 'target'], help='BRS vs BRT computation')#
@@ -62,7 +62,7 @@ p.add_argument('--checkpoint_toload', type=int, default=0, help='Checkpoint from
 opt = p.parse_args()
 
 # Set the source coordinates for the target set and the obstacle sets
-source_coords = [0., 0., 0.,1.]
+source_coords = [0., 0., 0.,3.2]
 if opt.counter_start == -1:
   opt.counter_start = opt.checkpoint_toload
 
@@ -90,7 +90,7 @@ root_path = os.path.join(opt.logging_root, opt.experiment_name)
 def val_fn(model, ckpt_dir, epoch):
   # Time values at which the function needs to be plotted
   #times = [0., 0.5*(opt.tMax - 0.1), (opt.tMax - 0.1)]
-  times = [0., 0.5*opt.tMax, opt.tMax]
+  times = [0., 0.25*opt.tMax, 0.5*opt.tMax, 0.75*opt.tMax, opt.tMax]
   num_times = len(times)
 
   # Theta slices to be plotted
@@ -112,8 +112,8 @@ def val_fn(model, ckpt_dir, epoch):
       theta_coords = torch.ones(mgrid_coords.shape[0], 1) * thetas[j]
       theta_coords = theta_coords / (opt.angle_alpha * math.pi)
 
-      dbar_coords = torch.ones(mgrid_coords.shape[0], 1) * 1.0  #plot for dbar=1
-      dbar_coords = (dbar_coords - 0.8) / 0.8                #scale back to (-1,+1)
+      dbar_coords = torch.ones(mgrid_coords.shape[0], 1) * 3.2  #plot for dbar=3.2
+      dbar_coords = (dbar_coords - 3.2) / 3.2                #scale back to (-1,+1)
 
       coords = torch.cat((time_coords, mgrid_coords, theta_coords, dbar_coords), dim=1) 
       model_in = {'coords': coords.cuda()}
@@ -125,8 +125,8 @@ def val_fn(model, ckpt_dir, epoch):
 
       # Unnormalize the value function
       norm_to = 0.02
-      mean = 0.25
-      var = 0.5
+      mean = 0.5
+      var = 0.7
       model_out = (model_out*var/norm_to) + mean 
 
       # Plot the zero level sets

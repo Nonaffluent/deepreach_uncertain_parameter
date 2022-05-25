@@ -206,7 +206,7 @@ def initialize_hji_drone3Dp1D(dataset, minWith):
         dudx[..., 2] = dudx[..., 2] / alpha_angle
         # Scale the coordinates
         x_theta = alpha_angle * x_theta
-        x_dbar = (x_dbar * 0.8) + 0.8  #(0 to 1.6)
+        x_dbar = (x_dbar * 3.2) + 3.2  #(0 to 6.4)
 
         # Air3Dp1D dynamics
         # \dot x    = v*cos(th) + dx
@@ -216,8 +216,8 @@ def initialize_hji_drone3Dp1D(dataset, minWith):
 
         # Compute the hamiltonian #dudx[..., 0]=b1  x[..., 1]=x_pos 
         ham = -omega_max * torch.abs(dudx[..., 2])  # Control component
-        ham = ham - x[..., 3] * torch.norm(dudx[..., 0:2], dim=2)  # Disturbance component
-        ham = ham + velocity * dudx[..., 0] * torch.cos(x[..., 2]) + velocity * dudx[..., 1] * torch.sin(x[..., 2])  # Constant component
+        ham = ham - x_dbar * torch.norm(dudx[..., 0:2], dim=2)  # Disturbance component
+        ham = ham + velocity * dudx[..., 0] * torch.cos(x_theta) + velocity * dudx[..., 1] * torch.sin(x_theta)  # Constant component
 
         # If we are computing BRT then take min with zero
         if minWith == 'zero':

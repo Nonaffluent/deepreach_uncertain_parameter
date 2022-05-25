@@ -314,9 +314,9 @@ class ReachabilityAir3Dp1DSource(Dataset):
 
 
 class ReachabilityDrone3Dp1DSource(Dataset):
-    def __init__(self, numpoints, velocity=2.0,
-        omega_max=1.0, pretrain=False, tMin=0.0,
-        tMax=4.0, counter_start=0, counter_end=100e3, 
+    def __init__(self, numpoints, velocity=8.0,
+        omega_max=80.0, pretrain=False, tMin=0.0,
+        tMax=1.0, counter_start=0, counter_end=100e3, 
         pretrain_iters=2000, angle_alpha=1.0, num_src_samples=1000, seed=0):
         super().__init__()
         torch.manual_seed(0)
@@ -355,6 +355,7 @@ class ReachabilityDrone3Dp1DSource(Dataset):
 
     def compute_gx(self, state_coords):
         # Compute the obstacle boundary condition given the state coordinates. Negative inside the obstacle positive outside.
+        # signed distance except on diag
         dist_obs1 = torch.max(torch.abs(state_coords[:, 0] - (-.75)) - .25, torch.abs(state_coords[:, 1] - (-.25)) - .25)
         dist_obs2 = torch.max(torch.abs(state_coords[:, 0] - (-.15)) - .15, torch.abs(state_coords[:, 1] - (-.25)) - .25)
         dist = torch.min(dist_obs1,dist_obs2)
@@ -392,8 +393,8 @@ class ReachabilityDrone3Dp1DSource(Dataset):
         lx, hx, boundary_values = self.compute_IC(coords[:, 1:])
         # normalize the value function
         norm_to = 0.02
-        mean = 0.25
-        var = 0.5
+        mean = 0.5
+        var = 0.7
         
         boundary_values = (boundary_values - mean)*norm_to/var
         lx = (lx - mean)*norm_to/var

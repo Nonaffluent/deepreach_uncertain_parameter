@@ -15,11 +15,11 @@ import math
 from torch.utils.data import DataLoader
 import configargparse
 
-checkpoint_toload=10000
+checkpoint_toload=119000
 # Load the model
 model = modules.SingleBVPNet(in_features=5, out_features=1, type='sine', mode='mlp', final_layer_factor=1., hidden_features=512, num_hidden_layers=3)
 model.cuda()
-root_path = os.path.join('./logs', 'Drone_t1')
+root_path = os.path.join('./deepreach_uncertain_parameter/experiment_scripts/logs', 'Drone_t1')
 ckpt_dir = os.path.join(root_path, 'checkpoints')
 ckpt_path = os.path.join(ckpt_dir, 'model_epoch_%04d.pth' % checkpoint_toload)
 checkpoint = torch.load(ckpt_path)
@@ -31,20 +31,18 @@ except:
 model.load_state_dict(model_weights)
 model.eval()
 
-
-
 angle_alpha=1.2
 epoch=checkpoint_toload
 tMax=1.0
-omega_a=5.5
+omega_max=80.0
 
-times = [0.]
+# times to plot
+times = [0., 0.25*tMax, 0.5*tMax, 0.75*tMax, tMax]
 num_times = len(times)
 
 # Theta slices to be plotted
 thetas = [-math.pi, -0.5*math.pi, 0., 0.5*math.pi, math.pi]
 num_thetas = len(thetas)
-
 # Create a figure
 fig = plt.figure(figsize=(5*num_thetas, 5*num_times))
 
@@ -52,6 +50,7 @@ fig = plt.figure(figsize=(5*num_thetas, 5*num_times))
 sidelen = 200
 mgrid_coords = dataio.get_mgrid(sidelen)
 
+dbar=6.0
 # Start plotting the results
 for i in range(num_times):
     time_coords = torch.ones(mgrid_coords.shape[0], 1) * times[i]
@@ -60,8 +59,8 @@ for i in range(num_times):
       theta_coords = torch.ones(mgrid_coords.shape[0], 1) * thetas[j]
       theta_coords = theta_coords / (angle_alpha * math.pi)
 
-      dbar_coords = torch.ones(mgrid_coords.shape[0], 1) * 1.0  #plot for dbar=1
-      dbar_coords = (dbar_coords - 0.8) / 0.8                #scale back to (-1,+1)
+      dbar_coords = torch.ones(mgrid_coords.shape[0], 1) * dbar  #plot for dbar
+      dbar_coords = (dbar_coords - 3.2) / 3.2                #scale back to (-1,+1)
 
       coords = torch.cat((time_coords, mgrid_coords, theta_coords, dbar_coords), dim=1) 
       model_in = {'coords': coords.cuda()}
@@ -73,13 +72,12 @@ for i in range(num_times):
 
       # Unnormalize the value function
       norm_to = 0.02
-      mean = 0.25
-      var = 0.5
+      mean = 0.5
+      var = 0.7
       model_out = (model_out*var/norm_to) + mean 
 
       # Plot the zero level sets
-      #model_out = (model_out <= 0.001)*1.
-      model_out=(model_out+.158)/1.73 #hardcoded to range (0,1)
+      model_out = (model_out <= 0.001)*1.      
 
       # Plot the actual data
       ax = fig.add_subplot(num_times, num_thetas, (j+1) + i*num_thetas)
@@ -88,4 +86,4 @@ for i in range(num_times):
       fig.colorbar(s) 
 
 
-fig.savefig(os.path.join(ckpt_dir, '0BRT_drone_t0_%.2d.png' % 10))
+fig.savefig(os.path.join(ckpt_dir, '0BRT_drone_t1_%.2f.png' % dbar))
