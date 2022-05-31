@@ -364,7 +364,8 @@ class ReachabilityDrone3Dp1DSource(Dataset):
 
     def compute_IC(self, state_coords):
         lx = self.compute_lx(state_coords)
-        gx = self.compute_gx(state_coords)
+        gx_factor = 6.0
+        gx = self.compute_gx(state_coords) * gx_factor
         hx = -gx       
         vx = torch.max(lx, hx)
         return lx, hx, vx    
@@ -393,8 +394,8 @@ class ReachabilityDrone3Dp1DSource(Dataset):
         lx, hx, boundary_values = self.compute_IC(coords[:, 1:])
         # normalize the value function
         norm_to = 0.02
-        mean = 0.5
-        var = 0.7
+        mean = 0.696
+        var = 0.872
         
         boundary_values = (boundary_values - mean)*norm_to/var
         lx = (lx - mean)*norm_to/var

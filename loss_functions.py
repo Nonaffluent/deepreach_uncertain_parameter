@@ -188,8 +188,8 @@ def initialize_hji_drone3Dp1D(dataset, minWith):
 
     def hji_drone3Dp1D(model_output, gt):
         source_boundary_values = gt['source_boundary_values']
-        lx = gt['lx']
-        hx = gt['hx']
+        lx = gt['lx']        
+        hx = gt['hx']  
         x = model_output['model_in']  # (meta_batch_size, num_points, 3+1+1)
         y = model_output['model_out']  # (meta_batch_size, num_points, 1)
         dirichlet_mask = gt['dirichlet_mask']
@@ -216,7 +216,7 @@ def initialize_hji_drone3Dp1D(dataset, minWith):
 
         # Compute the hamiltonian #dudx[..., 0]=b1  x[..., 1]=x_pos 
         ham = -omega_max * torch.abs(dudx[..., 2])  # Control component
-        ham = ham - x_dbar * torch.norm(dudx[..., 0:2], dim=2)  # Disturbance component
+        ham = ham + x_dbar * torch.norm(dudx[..., 0:2], dim=2)  # Disturbance component
         ham = ham + velocity * dudx[..., 0] * torch.cos(x_theta) + velocity * dudx[..., 1] * torch.sin(x_theta)  # Constant component
 
         # If we are computing BRT then take min with zero
@@ -228,10 +228,16 @@ def initialize_hji_drone3Dp1D(dataset, minWith):
         else:
             diff_constraint_hom = dudt - ham
             if minWith == 'target':
-                #diff_constraint_hom = torch.max(diff_constraint_hom[:, :, None], y - source_boundary_values)
-                diff_constraint_hom = torch.min(torch.max(diff_constraint_hom[:, :, None], y - lx), (y - hx))
+                diff_constraint_hom = torch.min(torch.max(diff_constraint_hom[:, :, None], y - lx), (y - hx))#BRAT form
+                #diff_constraint_hom = torch.max(diff_constraint_hom[:, :, None], y - lx)#BRT form
 
-        dirichlet = y[dirichlet_mask] - source_boundary_values[dirichlet_mask]   #####source bugged
+                # smoothing_exponent=8.0  #smooth BRAT form
+                # HJIVI_inner = torch.max(diff_constraint_hom[:, :, None], y - lx)
+                # soft_min_num = HJIVI_inner * torch.exp(-smoothing_exponent * HJIVI_inner) + (y-hx) * torch.exp(-smoothing_exponent * (y-hx))
+                # soft_min_den = torch.exp(-smoothing_exponent * HJIVI_inner) + torch.exp(-smoothing_exponent * (y-hx))
+                # diff_constraint_hom = soft_min_num/soft_min_den
+
+        dirichlet = y[dirichlet_mask] - source_boundary_values[dirichlet_mask]  
         # A factor of 15e2 to make loss roughly equal
         return {'dirichlet': torch.abs(dirichlet).sum() * batch_size / 15e2,
                 'diff_constraint_hom': torch.abs(diff_constraint_hom).sum()}

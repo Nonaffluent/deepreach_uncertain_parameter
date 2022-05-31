@@ -19,7 +19,7 @@ p = configargparse.ArgumentParser()
 p.add('-c', '--config_filepath', required=False, is_config_file=True, help='Path to config file.')
 
 p.add_argument('--logging_root', type=str, default='./logs', help='root for logging')
-p.add_argument('--experiment_name', type=str, default='Drone_t1', required=False,
+p.add_argument('--experiment_name', type=str, required=True,
                help='Name of subdirectory in logging_root where summaries and checkpoints will be saved.')
 
 # General training options
@@ -112,8 +112,8 @@ def val_fn(model, ckpt_dir, epoch):
       theta_coords = torch.ones(mgrid_coords.shape[0], 1) * thetas[j]
       theta_coords = theta_coords / (opt.angle_alpha * math.pi)
 
-      dbar_coords = torch.ones(mgrid_coords.shape[0], 1) * 3.2  #plot for dbar=3.2
-      dbar_coords = (dbar_coords - 3.2) / 3.2                #scale back to (-1,+1)
+      dbar_coords = torch.ones(mgrid_coords.shape[0], 1) * 6.0  #plot for dbar=
+      dbar_coords = (dbar_coords - 3.2) / 3.2                   #scale back to (-1,+1)
 
       coords = torch.cat((time_coords, mgrid_coords, theta_coords, dbar_coords), dim=1) 
       model_in = {'coords': coords.cuda()}
@@ -124,13 +124,13 @@ def val_fn(model, ckpt_dir, epoch):
       model_out = model_out.reshape((sidelen, sidelen))
 
       # Unnormalize the value function
-      norm_to = 0.02
-      mean = 0.5
-      var = 0.7
-      model_out = (model_out*var/norm_to) + mean 
+      #norm_to = 0.02
+      #mean = 0.696
+      #var = 0.872
+      #model_out = (model_out*var/norm_to) + mean 
 
       # Plot the zero level sets
-      model_out = (model_out <= 0.001)*1.
+      #model_out = (model_out <= 0.001)*1.
 
       # Plot the actual data
       ax = fig.add_subplot(num_times, num_thetas, (j+1) + i*num_thetas)
@@ -145,3 +145,4 @@ training.train(model=model, train_dataloader=dataloader, epochs=opt.num_epochs, 
                steps_til_summary=opt.steps_til_summary, epochs_til_checkpoint=opt.epochs_til_ckpt,
                model_dir=root_path, loss_fn=loss_fn, clip_grad=opt.clip_grad,
                use_lbfgs=opt.use_lbfgs, validation_fn=val_fn, start_epoch=opt.checkpoint_toload)
+               
