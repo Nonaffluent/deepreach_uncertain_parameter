@@ -19,7 +19,7 @@ checkpoint_toload=119000
 # Load the model
 model = modules.SingleBVPNet(in_features=5, out_features=1, type='sine', mode='mlp', final_layer_factor=1., hidden_features=512, num_hidden_layers=3)
 model.cuda()
-root_path = os.path.join('./deepreach_uncertain_parameter/experiment_scripts/logs', 'Drone_t1')
+root_path = os.path.join('./deepreach_uncertain_parameter/experiment_scripts/logs', 'Drone_6gx_8Smoo')
 ckpt_dir = os.path.join(root_path, 'checkpoints')
 ckpt_path = os.path.join(ckpt_dir, 'model_epoch_%04d.pth' % checkpoint_toload)
 checkpoint = torch.load(ckpt_path)
@@ -72,12 +72,12 @@ for i in range(num_times):
 
       # Unnormalize the value function
       norm_to = 0.02
-      mean = 0.5
-      var = 0.7
+      mean = 0.696
+      var = 0.872
       model_out = (model_out*var/norm_to) + mean 
 
       # Plot the zero level sets
-      model_out = (model_out <= 0.001)*1.      
+      #model_out = (model_out <= 0.001)*1.      
 
       # Plot the actual data
       ax = fig.add_subplot(num_times, num_thetas, (j+1) + i*num_thetas)
@@ -85,5 +85,5 @@ for i in range(num_times):
       s = ax.imshow(model_out.T, cmap='bwr', origin='lower', extent=(-1., 1., -1., 1.))
       fig.colorbar(s) 
 
-
-fig.savefig(os.path.join(ckpt_dir, '0BRT_drone_t1_%.2f.png' % dbar))
+summ_dir = os.path.join(root_path, 'summaries')
+fig.savefig(os.path.join('./deepreach_uncertain_parameter/experiment_scripts/logs', '8Smoo_gx6_drone_%.2f.png' % dbar))
