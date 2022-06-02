@@ -208,7 +208,7 @@ def initialize_hji_drone3Dp1D(dataset, minWith):
         x_theta = alpha_angle * x_theta
         x_dbar = (x_dbar * 3.2) + 3.2  #(0 to 6.4)
 
-        # Air3Dp1D dynamics
+        # Drone3Dp1D dynamics
         # \dot x    = v*cos(th) + dx
         # \dot y    = v*sin(th) + dy
         # \dot th   = w = u_control
@@ -228,8 +228,10 @@ def initialize_hji_drone3Dp1D(dataset, minWith):
         else:
             diff_constraint_hom = dudt - ham
             if minWith == 'target':
-                diff_constraint_hom = torch.min(torch.max(diff_constraint_hom[:, :, None], y - lx), (y - hx))#BRAT form
-                #diff_constraint_hom = torch.max(diff_constraint_hom[:, :, None], y - lx)#BRT form
+                #diff_constraint_hom = torch.min(torch.max(diff_constraint_hom[:, :, None], y - lx), (y - hx))#BRAT form
+
+                source_boundary_values= lx #BRT form
+                diff_constraint_hom = torch.max(diff_constraint_hom[:, :, None], y - lx)
 
                 # smoothing_exponent=8.0  #smooth BRAT form
                 # HJIVI_inner = torch.max(diff_constraint_hom[:, :, None], y - lx)
@@ -298,3 +300,55 @@ def initialize_hji_drone2D(dataset, minWith):
                 'diff_constraint_hom': torch.abs(diff_constraint_hom).sum()}
 
     return hji_drone2D
+
+
+def initialize_hji_drone3D(dataset, minWith):
+# Initialize the loss function for the Drone3D problem
+# The dynamics parameters
+    velocity = dataset.velocity
+    omega_max = dataset.omega_max
+    angle_alpha = dataset.angle_alpha
+    dbar = 6.0
+
+
+    def hji_Drone3D(model_output, gt):
+        source_boundary_values = gt['source_boundary_values']
+        x = model_output['model_in']  # (meta_batch_size, num_points, 4)
+        y = model_output['model_out']  # (meta_batch_size, num_points, 1)
+        dirichlet_mask = gt['dirichlet_mask']
+        batch_size = x.shape[1]
+
+        if torch.all(dirichlet_mask):
+            diff_constraint_hom = torch.Tensor([0])
+        else:
+            du, status = diff_operators.jacobian(y, x)
+            dudt = du[..., 0, 0]
+            dudx = du[..., 0, 1:]
+
+            x_x = x[..., 1] * 1.0
+            x_y = x[..., 2] * 1.0
+            x_theta =  x[..., 3] * math.pi
+
+            # Scale the costate for theta appropriately to align with the range of [-pi, pi]
+            dudx[..., 2] = dudx[..., 2] / (angle_alpha * math.pi )            
+
+            # Compute the hamiltonian #dudx[..., 0]=b1   
+            ham = -omega_max * torch.abs(dudx[..., 2])  # Control component
+            ham = ham + dbar * torch.norm(dudx[..., 0:2], dim=2)  # Disturbance component
+            ham = ham + velocity * dudx[..., 0] * torch.cos(x_theta) + velocity * dudx[..., 1] * torch.sin(x_theta)  # Constant component
+            
+            # If we are computing BRT then take min with zero
+            if minWith == 'zero':
+                ham = torch.clamp(ham, max=0.0)
+
+            diff_constraint_hom = dudt - ham
+            if minWith == 'target':
+                diff_constraint_hom = torch.max(diff_constraint_hom[:, :, None], y - source_boundary_values)
+
+        dirichlet = y[dirichlet_mask] - source_boundary_values[dirichlet_mask]
+
+        # A factor of 15e2 to make loss roughly equal
+        return {'dirichlet': torch.abs(dirichlet).sum() * batch_size / 15e2,
+                'diff_constraint_hom': torch.abs(diff_constraint_hom).sum()}
+
+    return hji_Drone3D
