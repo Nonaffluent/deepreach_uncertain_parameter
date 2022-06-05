@@ -501,10 +501,11 @@ class ReachabilityDrone2DSource(Dataset):
 
 
 class ReachabilityDrone3DSource(Dataset):
-    def __init__(self, numpoints, velocity=8.0,
-        omega_max=80.0, pretrain=False, tMin=0.0,
+    def __init__(self, numpoints, velocity=1.0, dbar=0.75,
+        omega_max=10.0, pretrain=False, tMin=0.0,
         tMax=1.0, counter_start=0, counter_end=100e3, 
-        pretrain_iters=2000, angle_alpha=1.2, num_src_samples=1000, seed=0):
+        pretrain_iters=2000, angle_alpha=1.2, time_alpha=1.0,
+        num_src_samples=1000, seed=0):
      
         super().__init__()
         torch.manual_seed(0)
@@ -514,8 +515,10 @@ class ReachabilityDrone3DSource(Dataset):
         
         self.velocity = velocity
         self.omega_max = omega_max
+        self.dbar = dbar
         
         self.angle_alpha = angle_alpha
+        self.time_alpha = time_alpha
         
         self.num_states = 3
       
