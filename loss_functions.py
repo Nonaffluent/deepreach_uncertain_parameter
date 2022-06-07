@@ -309,10 +309,8 @@ def initialize_hji_drone3D(dataset, minWith):
     omega_max = dataset.omega_max
     dbar = dataset.dbar
 
-    angle_alpha = dataset.angle_alpha
-    time_alpha = dataset.time_alpha
-    
-
+    alpha = dataset.alpha
+    beta  = dataset.beta
 
     def hji_Drone3D(model_output, gt):
         source_boundary_values = gt['source_boundary_values']
@@ -332,10 +330,14 @@ def initialize_hji_drone3D(dataset, minWith):
             x_y = x[..., 2] * 1.0
             x_theta = x[..., 3] * 1.0
 
-            x_theta =  x_theta * math.pi * angle_alpha
+            x_x = x_x * alpha['x'] + beta['x']
+            x_y = x_y * alpha['y'] + beta['y']
+            x_theta =  x_theta * alpha['th'] + beta['th']
             # Scale the costate for theta appropriately to align with the range of [-pi, pi]
-            dudx[..., 2] = dudx[..., 2] / (angle_alpha * math.pi )
-            dudt = dudt / time_alpha            
+            dudx[..., 0] = dudx[..., 0] / alpha['x']
+            dudx[..., 1] = dudx[..., 1] / alpha['y']
+            dudx[..., 2] = dudx[..., 2] / alpha['th']
+            dudt = dudt / alpha['time']            
 
             # Compute the hamiltonian #dudx[..., 0]=b1   
             ham = -omega_max * torch.abs(dudx[..., 2])  # Control component

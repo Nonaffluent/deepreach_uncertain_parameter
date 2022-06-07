@@ -501,11 +501,12 @@ class ReachabilityDrone2DSource(Dataset):
 
 
 class ReachabilityDrone3DSource(Dataset):
-    def __init__(self, numpoints, velocity=1.0, dbar=0.75,
-        omega_max=10.0, pretrain=False, tMin=0.0,
-        tMax=1.0, counter_start=0, counter_end=100e3, 
-        pretrain_iters=2000, angle_alpha=1.2, time_alpha=1.0,
-        num_src_samples=1000, seed=0):
+    def __init__(self, numpoints, velocity=2.0, dbar=0.8,
+        omega_max=1.0, pretrain=False, tMin=0.0,
+        tMax=1.0, state_setting='big',
+        counter_start=0, counter_end=100e3,
+        pretrain_iters=2000, num_src_samples=1000,
+        seed=0):
      
         super().__init__()
         torch.manual_seed(0)
@@ -516,14 +517,31 @@ class ReachabilityDrone3DSource(Dataset):
         self.velocity = velocity
         self.omega_max = omega_max
         self.dbar = dbar
-        
-        self.angle_alpha = angle_alpha
-        self.time_alpha = time_alpha
-        
+
         self.num_states = 3
       
         self.tMin = tMin
         self.tMax = tMax
+
+        self.alpha = {}
+        self.beta = {}
+
+        if state_setting == 'big':
+            self.alpha['x'] = 20.0
+            self.alpha['y'] = 20.0
+            self.alpha['th'] = 1.2*math.pi           
+            self.alpha['time'] = 80.0
+
+            self.beta['x'] = 20.0
+            self.beta['y'] = 20.0
+            self.beta['th'] = 0.0
+
+            # Target positions
+            self.goalX = np.array([15.0])
+            self.goalY = np.array([25.0])
+            self.L = 4.0            
+        else:
+            raise NotImplementedError
 
         self.N_src_samples = num_src_samples
 
@@ -556,13 +574,20 @@ class ReachabilityDrone3DSource(Dataset):
             coords[-self.N_src_samples:, 0] = start_time
 
         # set up the initial value function
-        goal_tensor = torch.tensor([-.25, .25]).type(torch.FloatTensor)[None]
-        boundary_values = torch.norm(coords[:, 1:3] - goal_tensor, dim=1, keepdim=True) - 0.2
+        state_coords_unnormalized = coords[..., 1:] * 1.0
+        state_coords_unnormalized[:, 0] = state_coords_unnormalized[:, 0] * self.alpha['x'] + self.beta['x']
+        state_coords_unnormalized[:, 1] = state_coords_unnormalized[:, 1] * self.alpha['y'] + self.beta['y']
+        state_coords_unnormalized[:, 2] = state_coords_unnormalized[:, 2] * self.alpha['th'] + self.beta['th']
+
+        goal_tensor = torch.tensor([self.goalX[0], self.goalY[0]]).type(torch.FloatTensor)[None]
+        boundary_values = torch.norm(state_coords_unnormalized[:, 0:2] - goal_tensor, dim=1, keepdim=True) - self.L
+        # goal_tensor = torch.tensor([-.25, .25]).type(torch.FloatTensor)[None]
+        # boundary_values = torch.norm(coords[:, 1:3] - goal_tensor, dim=1, keepdim=True) - 0.2
         
         # normalize the value function
         norm_to = 0.02
-        mean = 0.7
-        var = 0.9
+        mean = 0.7 * self.alpha['x']
+        var = 0.9 * self.alpha['x']
         boundary_values = (boundary_values - mean)*norm_to/var
         
         if self.pretrain:
@@ -580,3 +605,6 @@ class ReachabilityDrone3DSource(Dataset):
             self.pretrain = False
 
         return {'coords': coords}, {'source_boundary_values': boundary_values, 'dirichlet_mask': dirichlet_mask}
+
+
+

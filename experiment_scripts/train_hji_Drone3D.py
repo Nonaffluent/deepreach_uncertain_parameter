@@ -48,9 +48,10 @@ p.add_argument('--num_src_samples', type=int, default=20000, required=False, hel
 p.add_argument('--velocity', type=float, default=1.0, required=False, help='Speed of the Drone')#
 p.add_argument('--omega_max', type=float, default=10.0, required=False, help='Turn rate of the car')#
 p.add_argument('--dbar', type=float, default=0.75, required=False, help='disturbance magnitude')#
-p.add_argument('--angle_alpha', type=float, default=1.2, required=False, help='Angle alpha coefficient.')#
-p.add_argument('--time_alpha', type=float, default=1.0, required=False, help='Time alpha coefficient.')#
+#p.add_argument('--angle_alpha', type=float, default=1.2, required=False, help='Angle alpha coefficient.')#
+#p.add_argument('--time_alpha', type=float, default=1.0, required=False, help='Time alpha coefficient.')#
 p.add_argument('--minWith', type=str, default='target', required=False, choices=['none', 'zero', 'target'], help='BRS vs BRT computation')#
+p.add_argument('--state_setting', type=str, default='big', required=False, help='choose state alpha&beta setting corresponding to grid')#
 
 p.add_argument('--clip_grad', default=0.0, type=float, help='Clip gradient.')
 p.add_argument('--use_lbfgs', default=False, type=bool, help='use L-BFGS.')
@@ -72,10 +73,11 @@ if opt.counter_end == -1:
 
 dataset = dataio.ReachabilityDrone3DSource(numpoints=65000, velocity=opt.velocity, dbar=opt.dbar,
                                           omega_max=opt.omega_max, pretrain=opt.pretrain, tMin=opt.tMin,
-                                          tMax=opt.tMax, counter_start=opt.counter_start, counter_end=opt.counter_end,
-                                          pretrain_iters=opt.pretrain_iters, seed=opt.seed,
-                                          angle_alpha=opt.angle_alpha,
-                                          num_src_samples=opt.num_src_samples)
+                                          tMax=opt.tMax, state_setting=opt.state_setting,
+                                          counter_start=opt.counter_start, counter_end=opt.counter_end,
+                                          pretrain_iters=opt.pretrain_iters, num_src_samples=opt.num_src_samples,
+                                          seed=opt.seed)
+
 
 dataloader = DataLoader(dataset, shuffle=True, batch_size=opt.batch_size, pin_memory=True, num_workers=0)
 
@@ -110,7 +112,7 @@ def val_fn(model, ckpt_dir, epoch):
 
     for j in range(num_thetas):
       theta_coords = torch.ones(mgrid_coords.shape[0], 1) * thetas[j]
-      theta_coords = theta_coords / (opt.angle_alpha * math.pi)
+      theta_coords = theta_coords / (1.2 * math.pi)
 
       coords = torch.cat((time_coords, mgrid_coords, theta_coords), dim=1) 
       model_in = {'coords': coords.cuda()}
@@ -122,8 +124,8 @@ def val_fn(model, ckpt_dir, epoch):
 
       # Unnormalize the value function
       norm_to = 0.02
-      mean = 0.7
-      var = 0.9
+      mean = 0.7 * 20
+      var = 0.9 * 20
       model_out = (model_out*var/norm_to) + mean 
 
       # Plot the zero level sets
