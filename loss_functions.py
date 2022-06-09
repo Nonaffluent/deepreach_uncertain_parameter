@@ -359,3 +359,96 @@ def initialize_hji_drone3D(dataset, minWith):
                 'diff_constraint_hom': torch.abs(diff_constraint_hom).sum() * 8.0}
 
     return hji_Drone3D
+
+
+def initialize_hji_narrowpassage(dataset, minWith, diffModel):
+    # Initialize the loss function for the narrow passage problem
+    # Normalization co-efficients
+    alpha = dataset.alpha 
+    beta = dataset.beta
+    compute_overall_ham = dataset.compute_overall_ham
+    clip_value_gradients = dataset.clip_value_gradients
+    HJIVI_smoothing_setting = dataset.HJIVI_smoothing_setting
+    smoothing_exponent = dataset.smoothing_exponent   
+    normalized_zero_value = -dataset.mean * dataset.norm_to/dataset.var #The normalized value corresponding to V=0 
+
+    def hji_narrowpassage(model_output, gt):
+        source_boundary_values = gt['source_boundary_values']
+        lx = gt['lx']
+        # gx = gt['gx']
+        hx = gt['hx']
+        x = model_output['model_in']  # (meta_batch_size, num_points, 8)
+        y = model_output['model_out']  # (meta_batch_size, num_points, 1)
+        dirichlet_mask = gt['dirichlet_mask']
+        batch_size = x.shape[1]
+
+        if torch.all(dirichlet_mask):
+            diff_constraint_hom = torch.Tensor([0])
+        else:
+            du, status = diff_operators.jacobian(y, x)
+            if clip_value_gradients:
+                mean_tensor = torch.mean(du, dim=1, keepdim=True) 
+                std_tensor = torch.std(du, dim=1, keepdim=True) 
+                interval = 2.0
+                normalized_du = (du - mean_tensor) / std_tensor
+                du = mean_tensor + std_tensor * torch.clamp(normalized_du, min=-interval, max=interval)
+
+            dudt = du[..., 0, 0]
+            dudx = du[..., 0, 1:]
+
+            if diffModel:
+                # Compute the spatial gradient of lx
+                dudx = dudx + gt['boundary_valfunc_grads']
+                diff_from_lx = y + source_boundary_values - lx
+                diff_from_hx = y + source_boundary_values - hx
+            else:
+                diff_from_lx = y - lx
+                diff_from_hx = y - hx
+
+            # Compute Hamiltonian
+            ham = compute_overall_ham(x[..., 1:], dudx)
+            
+            # If we are computing BRT then take min with zero
+            if minWith == 'zero':
+                ham = torch.clamp(ham, max=0.0)
+
+            # diff_constraint_hom = dudt - ham * alpha['time']
+            diff_constraint_hom = (dudt / alpha['time']) - ham
+            # import ipdb; ipdb.set_trace()
+            if minWith == 'target':
+                if HJIVI_smoothing_setting in ['v2']:
+                    soft_max_num =  diff_constraint_hom[:, :, None] * torch.exp(smoothing_exponent * diff_constraint_hom[:, :, None]) + diff_from_lx * torch.exp(smoothing_exponent * diff_from_lx)
+                    soft_max_den = torch.exp(smoothing_exponent * diff_constraint_hom[:, :, None]) + torch.exp(smoothing_exponent * diff_from_lx)
+                    HJIVI_inner = soft_max_num/soft_max_den
+
+                    soft_min_num = HJIVI_inner * torch.exp(-smoothing_exponent * HJIVI_inner) + diff_from_hx * torch.exp(-smoothing_exponent * diff_from_hx)
+                    soft_min_den = torch.exp(-smoothing_exponent * HJIVI_inner) + torch.exp(-smoothing_exponent * diff_from_hx)
+                    diff_constraint_hom = soft_min_num/soft_min_den
+                elif HJIVI_smoothing_setting in ['v3']:
+                    HJIVI_inner = torch.max(diff_constraint_hom[:, :, None], diff_from_lx)
+                    soft_min_num = HJIVI_inner * torch.exp(-smoothing_exponent * HJIVI_inner) + diff_from_hx * torch.exp(-smoothing_exponent * diff_from_hx)
+                    soft_min_den = torch.exp(-smoothing_exponent * HJIVI_inner) + torch.exp(-smoothing_exponent * diff_from_hx)
+                    # import ipdb; ipdb.set_trace()
+                    diff_constraint_hom = soft_min_num/soft_min_den
+                else:
+                    # diff_constraint_hom = torch.min(torch.max(diff_constraint_hom[:, :, None], y - lx), (y + gx))
+                    diff_constraint_hom = torch.min(torch.max(diff_constraint_hom[:, :, None], diff_from_lx), diff_from_hx)
+
+                    # # Limit the gradients
+                    # mean_diff = torch.mean(diff_constraint_hom)[None]
+                    # std_diff = torch.std(diff_constraint_hom)[None]
+                    # upper_bar = (mean_diff + 2*std_diff).detach().cpu().numpy()
+                    # lower_bar = (mean_diff - 2*std_diff).detach().cpu().numpy()
+                    # diff_constraint_hom = torch.clamp(diff_constraint_hom, max=upper_bar[0], min=lower_bar[0])
+                    # print('Warning! Currently clipping the PDE loss.')
+
+        if diffModel:
+            dirichlet = y[dirichlet_mask] - normalized_zero_value
+        else:
+            dirichlet = y[dirichlet_mask] - source_boundary_values[dirichlet_mask]
+
+        # A factor of 15e2 to make loss roughly equal
+        return {'dirichlet': torch.abs(dirichlet).sum() * batch_size / 15e2,
+                'diff_constraint_hom': torch.abs(diff_constraint_hom).sum()}
+
+    return hji_narrowpassage
