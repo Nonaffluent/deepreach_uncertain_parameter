@@ -80,7 +80,7 @@ dataset = dataio.ReachabilityNarrowPassageSource(numpoints=65000, pretrain=opt.p
                                                   smoothing_exponent=opt.smoothing_exponent, num_src_samples=opt.num_src_samples, diffModel=opt.diffModel)
 dataloader = DataLoader(dataset, shuffle=True, batch_size=opt.batch_size, pin_memory=True, num_workers=0)
 
-model = modules.SingleBVPNet(in_features=11, out_features=1, type=opt.model, mode=opt.mode,
+model = modules.SingleBVPNet(in_features=12, out_features=1, type=opt.model, mode=opt.mode,
                                 final_layer_factor=1., hidden_features=512, num_hidden_layers=opt.num_hl)
 model.cuda()
 
@@ -103,16 +103,17 @@ def val_fn_BRS(model):
   num_times = np.shape(times)[0]
 
   # Slices to be plotted (x-y of the first vehicle)
-  slices = np.array([[0.0, 0.0, 0.0, -6.0, 1.4, -math.pi, 0.0, 0.0], 
-                     [0.0, 3.0, 0.0, -6.0, 1.4, -math.pi, 2.0, 0.0], 
-                     [0.0, 6.5, 0.0, -6.0, 1.4, -math.pi, 4.0, 0.0], 
-                     [0.0, 4.0, 0.0, 6.0, 1.4, -math.pi, 3.0, 0.0],
-                     [0.0, 1.0, 0.0, 6.0, 1.4, -math.pi, 3.0, 0.0]])
+  #                  [th1, v1 ,phi1,  x2,   y2,   th2   , v2 ,phi2, mu]
+  slices = np.array([[0.0, 0.0, 0.0, -6.0, 1.4, -math.pi, 0.0, 0.0, 0.0], 
+                     [0.0, 3.0, 0.0, -6.0, 1.4, -math.pi, 2.0, 0.0, 0.0], 
+                     [0.0, 6.5, 0.0, -6.0, 1.4, -math.pi, 4.0, 0.0, 0.0], 
+                     [0.0, 4.0, 0.0, 6.0, 1.4, -math.pi, 3.0, 0.0, 0.0],
+                     [0.0, 1.0, 0.0, 6.0, 1.4, -math.pi, 3.0, 0.0, 0.0]])
   num_slices = slices.shape[0]
 
   # Create figures
-  fig = plt.figure(figsize=(5*num_slices, 5*num_times))
-  fig_valfunc = plt.figure(figsize=(5*num_slices, 5*num_times))
+  fig = plt.figure(figsize=(10*num_slices, 5*num_times))
+  fig_valfunc = plt.figure(figsize=(10*num_slices, 5*num_times))
 
   # Get the meshgrid in the (x, y) coordinate
   sidelen = 200
@@ -133,7 +134,9 @@ def val_fn_BRS(model):
       v_R2_coords = torch.ones(mgrid_coords.shape[0], 1) * (slices[j, 6] - beta['v'])/ alpha['v']
       phi_R2_coords = torch.ones(mgrid_coords.shape[0], 1) * (slices[j, 7] - beta['phi'])/ alpha['phi']
 
-      coords = torch.cat((time_coords, mgrid_coords, th_R1_coords, v_R1_coords, phi_R1_coords, x_R2_coords, y_R2_coords, th_R2_coords, v_R2_coords, phi_R2_coords), dim=1) 
+      mu_coords = torch.ones(mgrid_coords.shape[0], 1) * (slices[j, 8])
+
+      coords = torch.cat((time_coords,mgrid_coords,th_R1_coords,v_R1_coords,phi_R1_coords,x_R2_coords,y_R2_coords,th_R2_coords,v_R2_coords,phi_R2_coords,mu_coords), dim=1) 
       model_in = {'coords': coords.cuda()}
       model_out = model(model_in)['model_out']
 
@@ -155,13 +158,15 @@ def val_fn_BRS(model):
 
       # R2 position
       R2_pos = [slices[j, 3], slices[j, 4]]
+      mu = slices[j, 8]
 
       ### Plot the zero level sets
       ax = fig.add_subplot(num_times, num_slices, (j+1) + i*num_slices)
       ax.set_title('t = %0.2f, slice = %i' % (times[i], j+1))
       s = ax.imshow(brt.T, cmap='bwr', origin='lower', extent=(-alpha['x'], alpha['x'], -alpha['y'], alpha['y']), aspect=(alpha['x']/alpha['y']), vmin=-1., vmax=1.)
       fig.colorbar(s) 
-      ax = add_environment_stuff(ax, R2_pos)
+      ax = add_environment_stuff(ax, R2_pos, mu)
+      ax.set_aspect('equal')
 
       ### Plot the actual value function
       ax_valfunc = fig_valfunc.add_subplot(num_times, num_slices, (j+1) + i*num_slices)
@@ -169,19 +174,22 @@ def val_fn_BRS(model):
       sV2 = ax_valfunc.contour(valfunc.T, cmap='bwr_r', alpha=0.5, origin='lower', levels=10, extent=(-alpha['x'], alpha['x'], -alpha['y'], alpha['y']))
       plt.clabel(sV2, levels=10, colors='k')
       fig_valfunc.colorbar(sV1)
-      ax_valfunc = add_environment_stuff(ax_valfunc, R2_pos)
+      ax_valfunc = add_environment_stuff(ax_valfunc, R2_pos, mu)
+      ax_valfunc.set_aspect('equal')
 
   return fig, fig_valfunc
 
 
-def add_environment_stuff(ax, R2_pos=None):
+def add_environment_stuff(ax, R2_pos=None, mu=None):
   ## Plot obstacles
   # Stranded vehicle
-  obs_ellipse = patches.Ellipse((dataset.stranded_car_pos[0], dataset.stranded_car_pos[1]), dataset.le, dataset.wi, color='gray', alpha=0.5)
+  diam_le = 4.0 + 2.0*mu #vehicle length as diameter
+  diam_wi = 1.5 + 0.5*mu   #vehicle width as diameter
+  obs_ellipse = patches.Ellipse((dataset.stranded_car_pos[0], dataset.stranded_car_pos[1]), diam_le, diam_wi, color='gray', alpha=0.5)
   ax.add_artist(obs_ellipse)
-
+  
   # Outside radius
-  obs_ellipse = patches.Ellipse((dataset.stranded_car_pos[0], dataset.stranded_car_pos[1]), dataset.le + 0.5*dataset.L, dataset.wi + 0.5*dataset.L, color='gray', alpha=0.5)
+  obs_ellipse = patches.Ellipse((dataset.stranded_car_pos[0], dataset.stranded_car_pos[1]), diam_le + dataset.L, diam_wi + dataset.L, color='gray', alpha=0.5)
   ax.add_artist(obs_ellipse)
 
   # Second vehicle

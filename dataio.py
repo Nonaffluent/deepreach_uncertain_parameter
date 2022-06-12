@@ -620,7 +620,7 @@ class ReachabilityNarrowPassageSource(Dataset):
         self.diffModel = diffModel
         
         self.num_vehicles = 2
-        self.num_states = 5 * self.num_vehicles
+        self.num_states = 5 * self.num_vehicles + 1  #+mu
 
         self.tMax = tMax
         self.tMin = tMin
@@ -631,94 +631,94 @@ class ReachabilityNarrowPassageSource(Dataset):
         self.alpha = {}
         self.beta = {}
 
-        if speed_setting == 'high':
-            self.alpha['x'] = 60.0
-            self.alpha['y'] = 3.8
-            self.alpha['th'] = 1.2*math.pi
-            self.alpha['v'] = 7.0
-            self.alpha['phi'] = 1.2*0.1*math.pi
-            self.alpha['time'] = 10.0/self.tMax
+        # if speed_setting == 'high':
+        #     self.alpha['x'] = 60.0
+        #     self.alpha['y'] = 3.8
+        #     self.alpha['th'] = 1.2*math.pi
+        #     self.alpha['v'] = 7.0
+        #     self.alpha['phi'] = 1.2*0.1*math.pi
+        #     self.alpha['time'] = 10.0/self.tMax
 
-            self.beta['x'] = 0.0
-            self.beta['y'] = 0.0
-            self.beta['th'] = 0.0
-            self.beta['v'] = 6.0
-            self.beta['phi'] = 0.0
+        #     self.beta['x'] = 0.0
+        #     self.beta['y'] = 0.0
+        #     self.beta['th'] = 0.0
+        #     self.beta['v'] = 6.0
+        #     self.beta['phi'] = 0.0
 
-            # Target positions
-            self.goalX = np.array([36.0, -36.0])
-            self.goalY = np.array([-1.4, 1.4])
+        #     # Target positions
+        #     self.goalX = np.array([36.0, -36.0])
+        #     self.goalY = np.array([-1.4, 1.4])
 
-            # State bounds
-            self.vMin = 0.001
-            self.vMax = 11.999
-            self.phiMin = -0.1*math.pi + 0.001
-            self.phiMax = 0.1*math.pi - 0.001
+        #     # State bounds
+        #     self.vMin = 0.001
+        #     self.vMax = 11.999
+        #     self.phiMin = -0.1*math.pi + 0.001
+        #     self.phiMax = 0.1*math.pi - 0.001
 
-            # Control bounds
-            self.aMin = -4.0
-            self.aMax = 2.0
-            self.psiMin = -0.1*math.pi
-            self.psiMax = 0.1*math.pi
-        elif speed_setting == 'low':
-            self.alpha['x'] = 8.0
-            self.alpha['y'] = 3.8
-            self.alpha['th'] = 1.2*math.pi
-            self.alpha['v'] = 3.0
-            self.alpha['phi'] = 1.2*0.1*math.pi
-            self.alpha['time'] = 6.0/self.tMax
+        #     # Control bounds
+        #     self.aMin = -4.0
+        #     self.aMax = 2.0
+        #     self.psiMin = -0.1*math.pi
+        #     self.psiMax = 0.1*math.pi
+        # elif speed_setting == 'low':
+        #     self.alpha['x'] = 8.0
+        #     self.alpha['y'] = 3.8
+        #     self.alpha['th'] = 1.2*math.pi
+        #     self.alpha['v'] = 3.0
+        #     self.alpha['phi'] = 1.2*0.1*math.pi
+        #     self.alpha['time'] = 6.0/self.tMax
 
-            self.beta['x'] = 0.0
-            self.beta['y'] = 0.0
-            self.beta['th'] = 0.0
-            self.beta['v'] = 2.0
-            self.beta['phi'] = 0.0
+        #     self.beta['x'] = 0.0
+        #     self.beta['y'] = 0.0
+        #     self.beta['th'] = 0.0
+        #     self.beta['v'] = 2.0
+        #     self.beta['phi'] = 0.0
 
-            # Target positions
-            self.goalX = np.array([6.0, -6.0])
-            self.goalY = np.array([-1.4, 1.4])
+        #     # Target positions
+        #     self.goalX = np.array([6.0, -6.0])
+        #     self.goalY = np.array([-1.4, 1.4])
 
-            # State bounds
-            self.vMin = 0.001
-            self.vMax = 4.50
-            self.phiMin = -0.1*math.pi + 0.001
-            self.phiMax = 0.1*math.pi - 0.001
+        #     # State bounds
+        #     self.vMin = 0.001
+        #     self.vMax = 4.50
+        #     self.phiMin = -0.1*math.pi + 0.001
+        #     self.phiMax = 0.1*math.pi - 0.001
 
-            # Control bounds
-            self.aMin = -4.0
-            self.aMax = 2.0
-            self.psiMin = -0.1*math.pi
-            self.psiMax = 0.1*math.pi
-        elif speed_setting == 'medium':
-            self.alpha['x'] = 8.0
-            self.alpha['y'] = 3.8
-            self.alpha['th'] = 1.2*math.pi
-            self.alpha['v'] = 4.0
-            self.alpha['phi'] = 1.2*0.3*math.pi
-            self.alpha['time'] = 10.0/self.tMax
+        #     # Control bounds
+        #     self.aMin = -4.0
+        #     self.aMax = 2.0
+        #     self.psiMin = -0.1*math.pi
+        #     self.psiMax = 0.1*math.pi
+        # elif speed_setting == 'medium':
+        #     self.alpha['x'] = 8.0
+        #     self.alpha['y'] = 3.8
+        #     self.alpha['th'] = 1.2*math.pi
+        #     self.alpha['v'] = 4.0
+        #     self.alpha['phi'] = 1.2*0.3*math.pi
+        #     self.alpha['time'] = 10.0/self.tMax
 
-            self.beta['x'] = 0.0
-            self.beta['y'] = 0.0
-            self.beta['th'] = 0.0
-            self.beta['v'] = 3.0
-            self.beta['phi'] = 0.0
+        #     self.beta['x'] = 0.0
+        #     self.beta['y'] = 0.0
+        #     self.beta['th'] = 0.0
+        #     self.beta['v'] = 3.0
+        #     self.beta['phi'] = 0.0
 
-            # Target positions
-            self.goalX = np.array([6.0, -6.0])
-            self.goalY = np.array([-1.4, 1.4])
+        #     # Target positions
+        #     self.goalX = np.array([6.0, -6.0])
+        #     self.goalY = np.array([-1.4, 1.4])
 
-            # State bounds
-            self.vMin = 0.001
-            self.vMax = 6.50
-            self.phiMin = -0.3*math.pi + 0.001
-            self.phiMax = 0.3*math.pi - 0.001
+        #     # State bounds
+        #     self.vMin = 0.001
+        #     self.vMax = 6.50
+        #     self.phiMin = -0.3*math.pi + 0.001
+        #     self.phiMax = 0.3*math.pi - 0.001
 
-            # Control bounds
-            self.aMin = -4.0
-            self.aMax = 2.0
-            self.psiMin = -0.3*math.pi
-            self.psiMax = 0.3*math.pi
-        elif speed_setting == 'medium_v2':
+        #     # Control bounds
+        #     self.aMin = -4.0
+        #     self.aMax = 2.0
+        #     self.psiMin = -0.3*math.pi
+        #     self.psiMax = 0.3*math.pi
+        if speed_setting == 'medium_v2':
             self.alpha['x'] = 8.0
             self.alpha['y'] = 3.8
             self.alpha['th'] = 1.2*math.pi
@@ -747,53 +747,53 @@ class ReachabilityNarrowPassageSource(Dataset):
             self.aMax = 2.0
             self.psiMin = -3.0*math.pi
             self.psiMax = 3.0*math.pi
-        elif speed_setting == 'medium_v3':
-            self.alpha['x'] = 8.0
-            self.alpha['y'] = 4.0
-            self.alpha['th'] = 1.2*math.pi
-            self.alpha['v'] = 4.0
-            self.alpha['phi'] = 1.2*0.3*math.pi
-            self.alpha['time'] = 10.0/self.tMax
+        # elif speed_setting == 'medium_v3':
+        #     self.alpha['x'] = 8.0
+        #     self.alpha['y'] = 4.0
+        #     self.alpha['th'] = 1.2*math.pi
+        #     self.alpha['v'] = 4.0
+        #     self.alpha['phi'] = 1.2*0.3*math.pi
+        #     self.alpha['time'] = 10.0/self.tMax
 
-            self.beta['x'] = 0.0
-            self.beta['y'] = 0.0
-            self.beta['th'] = 0.0
-            self.beta['v'] = 3.0
-            self.beta['phi'] = 0.0
+        #     self.beta['x'] = 0.0
+        #     self.beta['y'] = 0.0
+        #     self.beta['th'] = 0.0
+        #     self.beta['v'] = 3.0
+        #     self.beta['phi'] = 0.0
 
-            # Target positions
-            self.goalX = np.array([6.0, -6.0])
-            self.goalY = np.array([-2.0, 2.0])
+        #     # Target positions
+        #     self.goalX = np.array([6.0, -6.0])
+        #     self.goalY = np.array([-2.0, 2.0])
 
-            # State bounds
-            self.vMin = 0.001
-            self.vMax = 6.50
-            self.phiMin = -0.3*math.pi + 0.001
-            self.phiMax = 0.3*math.pi - 0.001
+        #     # State bounds
+        #     self.vMin = 0.001
+        #     self.vMax = 6.50
+        #     self.phiMin = -0.3*math.pi + 0.001
+        #     self.phiMax = 0.3*math.pi - 0.001
 
-            # Control bounds
-            self.aMin = -4.0
-            self.aMax = 2.0
-            self.psiMin = -3.0*math.pi
-            self.psiMax = 3.0*math.pi
+        #     # Control bounds
+        #     self.aMin = -4.0
+        #     self.aMax = 2.0
+        #     self.psiMin = -3.0*math.pi
+        #     self.psiMax = 3.0*math.pi
         else:
             raise NotImplementedError
 
         # How to weigh the obstacles
         self.gx_factor = gx_factor
 
-        if env_setting == 'v1':
-            # Vehicle diameter/length
-            self.L = 2.0
-            self.le = 3.0
-            self.wi = 1.0
+        # if env_setting == 'v1':
+        #     # Vehicle diameter/length
+        #     self.L = 2.0
+        #     self.le = 3.0
+        #     self.wi = 1.0
 
-            # Lower and upper curb positions (in the y direction)
-            self.curb_positions = np.array([-2.8, 2.8])
+        #     # Lower and upper curb positions (in the y direction)
+        #     self.curb_positions = np.array([-2.8, 2.8])
 
-            # Stranded car position
-            self.stranded_car_pos = np.array([0.0, -1.4])
-        elif env_setting == 'v2':
+        #     # Stranded car position
+        #     self.stranded_car_pos = np.array([0.0, -1.4])
+        if env_setting == 'v2':
             # Vehicle diameter/length
             self.L = 2.0
             self.le = 3.0
@@ -804,15 +804,15 @@ class ReachabilityNarrowPassageSource(Dataset):
 
             # Stranded car position
             self.stranded_car_pos = np.array([0.0, -1.8])
-        elif env_setting == 'v3':
-            # Vehicle diameter/length
-            self.L = 2.0
+        # elif env_setting == 'v3':
+        #     # Vehicle diameter/length
+        #     self.L = 2.0
 
-            # Lower and upper curb positions (in the y direction)
-            self.curb_positions = np.array([-4.0, 4.0])
+        #     # Lower and upper curb positions (in the y direction)
+        #     self.curb_positions = np.array([-4.0, 4.0])
 
-            # Stranded car position
-            self.stranded_car_pos = np.array([0.0, -2.0])
+        #     # Stranded car position
+        #     self.stranded_car_pos = np.array([0.0, -2.0])
         else:
             raise NotImplementedError
 
@@ -887,13 +887,17 @@ class ReachabilityNarrowPassageSource(Dataset):
         stranded_car_pos = torch.tensor(self.stranded_car_pos*1.0).type(torch.FloatTensor)
         # dist_stranded_R1 = torch.norm(state_coords_unnormalized[:, 0:2] - stranded_car_pos, dim=1, keepdim=True) - self.L
         # dist_stranded_R2 = torch.norm(state_coords_unnormalized[:, 5:7] - stranded_car_pos, dim=1, keepdim=True) - self.L
-        
+        mu = state_coords_unnormalized[:, 10]
+        le = 2 + mu
+        wi = 0.75 + 0.25 * mu
         state_centered_R1 = state_coords_unnormalized[:, 0:2] - stranded_car_pos
-        state_centered_R1[:, 1] = state_centered_R1[:, 1] * (self.le/self.wi)
+        state_centered_R1[:, 1] = state_centered_R1[:, 1] * (le/wi)
         state_centered_R2 = state_coords_unnormalized[:, 5:7] - stranded_car_pos
-        state_centered_R2[:, 1] = state_centered_R2[:, 1] * (self.le/self.wi)
-        dist_stranded_R1 = torch.norm(state_centered_R1, dim=1, keepdim=True) - self.le
-        dist_stranded_R2 = torch.norm(state_centered_R2, dim=1, keepdim=True) - self.le
+        state_centered_R2[:, 1] = state_centered_R2[:, 1] * (le/wi)
+        le=torch.unsqueeze(le,0)   #le as column to be added with norm
+        le=torch.t(le)  
+        dist_stranded_R1 = torch.norm(state_centered_R1, dim=1, keepdim=True) - le
+        dist_stranded_R2 = torch.norm(state_centered_R2, dim=1, keepdim=True) - le
 
         dist_stranded = torch.min(dist_stranded_R1, dist_stranded_R2)
         
@@ -925,6 +929,8 @@ class ReachabilityNarrowPassageSource(Dataset):
         state_coords_unnormalized[:, 7] = state_coords_unnormalized[:, 7] * self.alpha['th'] + self.beta['th']
         state_coords_unnormalized[:, 8] = state_coords_unnormalized[:, 8] * self.alpha['v'] + self.beta['v']
         state_coords_unnormalized[:, 9] = state_coords_unnormalized[:, 9] * self.alpha['phi'] + self.beta['phi']
+
+        state_coords_unnormalized[..., 10] = state_coords_unnormalized[..., 10] *1.0
 
         lx = self.compute_lx(state_coords_unnormalized)
         gx = self.compute_gx(state_coords_unnormalized)
@@ -992,6 +998,8 @@ class ReachabilityNarrowPassageSource(Dataset):
         dudx[..., 8] = dudx[..., 8] / alpha['v']
         dudx[..., 9] = dudx[..., 9] / alpha['phi']
 
+        dudx[..., 10] = dudx[..., 10] * 1.0
+
         # Scale for output normalization
         norm_to = 0.02
         mean = 0.25 * alpha['x']
@@ -1011,6 +1019,7 @@ class ReachabilityNarrowPassageSource(Dataset):
         x_unnormalized[..., 7] = x_unnormalized[..., 7] * alpha['th'] + beta['th']
         x_unnormalized[..., 8] = x_unnormalized[..., 8] * alpha['v'] + beta['v']
         x_unnormalized[..., 9] = x_unnormalized[..., 9] * alpha['phi'] + beta['phi']
+        x_unnormalized[..., 10] = x_unnormalized[..., 10] * 1.0
 
         # Compute the hamiltonian
         ham_R1 = self.compute_vehicle_ham(x_unnormalized[..., 0:5], dudx[..., 0:5], Rindex=0) 
@@ -1047,6 +1056,7 @@ class ReachabilityNarrowPassageSource(Dataset):
         x_next[8] = u[2]
         x_next[9] = u[3]
 
+        x_next[10] = x[10] 
         return x + dt*x_next          
 
     def __len__(self):
@@ -1115,7 +1125,8 @@ class ReachabilityNarrowPassageSource(Dataset):
 
         # Compute the boundary value fuction gradient if required
         if self.diffModel:
-            kek=0#boundary_valfunc_grads = diff_operators.gradient(boundary_values, coords_var)[..., 1:]
+            kek=0
+            raise NotImplementedError#boundary_valfunc_grads = diff_operators.gradient(boundary_values, coords_var)[..., 1:]
         #kek replaces undefined diff_operators
         if self.pretrain:
             dirichlet_mask = torch.ones(coords.shape[0], 1) > 0
