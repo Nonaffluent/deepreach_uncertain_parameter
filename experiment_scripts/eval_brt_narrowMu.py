@@ -14,54 +14,6 @@ import torch
 import numpy as np
 import math
 from torch.utils.data import DataLoader
-import configargparse
-
-p = configargparse.ArgumentParser()
-
-p.add('-c', '--config_filepath', required=False, is_config_file=True, help='Path to config file.')
-p.add_argument('--logging_root', type=str, default='./logs', help='root for logging')
-p.add_argument('--experiment_name', type=str, required=False,help='Name of subdirectory in logging_root where summaries and checkpoints will be saved.')
-
-# General training options
-p.add_argument('--batch_size', type=int, default=32)
-p.add_argument('--lr', type=float, default=2e-5, help='learning rate. default=2e-5')
-p.add_argument('--num_epochs', type=int, default=180000, help='Number of epochs to train for.')
-p.add_argument('--epochs_til_ckpt', type=int, default=1000, help='Time interval in seconds until checkpoint is saved.')
-p.add_argument('--steps_til_summary', type=int, default=100, help='Time interval in seconds until tensorboard summary is saved.')
-p.add_argument('--model', type=str, default='sine', required=False, choices=['sine', 'tanh', 'sigmoid', 'relu'], help='Type of model to evaluate, default is sine.')
-p.add_argument('--mode', type=str, default='mlp', required=False, choices=['mlp', 'rbf', 'pinn'], help='Whether to use uniform velocity parameter')
-p.add_argument('--num_hl', type=int, default=3, required=False, help='The number of hidden layers')
-p.add_argument('--pretrain_iters', type=int, default=100000, required=False, help='Number of pretrain iterations')
-p.add_argument('--counter_start', type=int, default=-1, required=False, help='Defines the initial time for the curriculul training')
-p.add_argument('--counter_end', type=int, default=-1, required=False, help='Defines the linear step for curriculum training starting from the initial time')
-p.add_argument('--num_src_samples', type=int, default=10000, required=False, help='Number of source samples at each time step')
-p.add_argument('--sampling_bias_ratio', type=float, default=0.0, required=False, help='Sampling bias ratio in the non obstacle region')
-
-p.add_argument('--norm_scheme', type=str, default='hack1', required=False, choices=['hack1', 'hack2'], help='Normalization scheme to be used')
-p.add_argument('--speed_setting', type=str, default='medium_v2', required=False, help='The speed setting for the simulation.')
-p.add_argument('--env_setting', type=str, default='v2', required=False, help='The environment setting for the simulation.')
-p.add_argument('--ham_version', type=str, default='v1', required=False, help='The Hamiltonian version.')
-p.add_argument('--collision_setting', type=str, default='v1', required=False, help='The Hamiltonian version.')
-p.add_argument('--target_setting', type=str, default='v1', required=False, help='The Hamiltonian version.')
-p.add_argument('--clip_value_gradients', action='store_true', default=False, required=False, help='Clip dVdX and dVdT.')
-p.add_argument('--curriculum_version', type=str, default='v1', required=False, help='The curriculum training version.')
-
-p.add_argument('--HJIVI_smoothing_setting', type=str, default='v2', required=False, help='Smoothing setting for the HJIVI loss')
-p.add_argument('--smoothing_exponent', type=float, default=2.0, required=False, help='Smoothing exponent')
-p.add_argument('--diffModel', action='store_true', default=False, required=False, help='Should we train the difference model instead.')
-p.add_argument('--minWith', type=str, default='target', required=False, choices=['none', 'zero', 'target'], help='BRS vs BRT computation')
-p.add_argument('--gx_factor', type=float, default=1.0, required=False, help='Multiply g(x) by a number to make system care about value in those states.')
-p.add_argument('--clip_grad', default=0.0, type=float, help='Clip gradient.')
-p.add_argument('--use_lbfgs', default=False, type=bool, help='use L-BFGS.')
-p.add_argument('--pretrain', action='store_true', default=True, required=False, help='Pretrain dirichlet conditions')
-p.add_argument('--adjust_relative_grads', action='store_true', default=False, required=False, help='Adjust the relative gradient values.')
-p.add_argument('--checkpoint_path', default=None, help='Checkpoint to trained model.')
-p.add_argument('--checkpoint_toload', type=int, default=0, help='Checkpoint from which to restart the training.')
-
-p.add_argument('--tMin', type=float, default=0.0, required=False, help='Start time of the simulation')
-p.add_argument('--tMax', type=float, default=1.0, required=False, help='End time of simulation')
-opt = p.parse_args()
-
 
 checkpoint_toload=179000
 # Load the model
@@ -80,15 +32,13 @@ model.load_state_dict(model_weights)
 model.eval()
 
 
-dataset = dataio.ReachabilityNarrowPassageSource(numpoints=65000, pretrain=opt.pretrain, tMax=opt.tMax, tMin=opt.tMin,
-                                                  counter_start=opt.counter_start, counter_end=opt.counter_end, 
-                                                  pretrain_iters=opt.pretrain_iters, norm_scheme=opt.norm_scheme, gx_factor=opt.gx_factor, 
-                                                  speed_setting=opt.speed_setting, env_setting=opt.env_setting, target_setting=opt.target_setting,
-                                                  collision_setting=opt.collision_setting, clip_value_gradients=opt.clip_value_gradients,
-                                                  ham_version=opt.ham_version, sampling_bias_ratio=opt.sampling_bias_ratio, 
-                                                  curriculum_version=opt.curriculum_version, HJIVI_smoothing_setting=opt.HJIVI_smoothing_setting, 
-                                                  smoothing_exponent=opt.smoothing_exponent, num_src_samples=opt.num_src_samples, diffModel=opt.diffModel)
-
+tMax=4.0
+dataset = dataio.ReachabilityNarrowPassageSource(numpoints=65000, tMax=tMax,
+                                                 gx_factor=6.0, norm_scheme='hack1',
+                                                 speed_setting='medium_v2', 
+                                                 env_setting='v2', 
+                                                 HJIVI_smoothing_setting='v2', 
+                                                 smoothing_exponent=10.0)
 
 
 def plot_brt_val_point(time, unnormalized_state, dataset):
